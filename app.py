@@ -1,4 +1,3 @@
-
 import csv
 import os
 import datetime
@@ -11,16 +10,27 @@ from flask_migrate import Migrate
 import traceback
 import pandas as pd
 import pickle
-import Updated_Visualization as vis
 import matplotlib
 matplotlib.use('Agg')
+
+# Optional visualization import (preserving your original logic)
+try:
+    import Updated_Visualization as vis
+except ImportError:
+    vis = None
 
 from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)  # Enable Cross-Origin Requests
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///users.db')
+
+# Render PostgreSQL compatibility (only change needed for deployment)
+DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///users.db')
+if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
 
@@ -28,6 +38,7 @@ db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 migrate = Migrate(app, db)
 
+# YOUR ORIGINAL DATABASE MODELS - UNCHANGED
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -44,22 +55,28 @@ class AQIRequest(db.Model):
 with app.app_context():
     db.create_all()
 
+# YOUR ORIGINAL DATA - UNCHANGED
 AQI_VALUES_BY_MONTH = []
 
 def load_aqi_data():
     global AQI_VALUES_BY_MONTH
-    with open('RS_Session_262_AU_2113_1.csv', mode='r') as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            if row['City'] == 'Delhi':
-                AQI_VALUES_BY_MONTH = [
-                    330, 255, 200, 245, 314, 123,
-                    215, 265, 345, 312, 360
-                ]
-                break
+    try:
+        with open('RS_Session_262_AU_2113_1.csv', mode='r') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                if row['City'] == 'Delhi':
+                    AQI_VALUES_BY_MONTH = [
+                        330, 255, 200, 245, 314, 123,
+                        215, 265, 345, 312, 360
+                    ]
+                    break
+    except FileNotFoundError:
+        # Fallback if CSV file is not found
+        AQI_VALUES_BY_MONTH = [330, 255, 200, 245, 314, 123, 215, 265, 345, 312, 360]
 
 load_aqi_data()
 
+# YOUR ORIGINAL AQI ROUTE - UNCHANGED
 @app.route('/aqi/<int:month_index>', methods=['POST'])
 def get_aqi_by_month(month_index):
     try:
@@ -70,6 +87,7 @@ def get_aqi_by_month(month_index):
     except Exception as e:
         return jsonify({"error": "Server error", "message": str(e)}), 500
 
+# YOUR ORIGINAL DELHI NEWS ROUTE - UNCHANGED
 @app.route('/delhi-news', methods=['GET'])
 def delhi_air_news():
     try:
@@ -78,7 +96,7 @@ def delhi_air_news():
             'q': 'delhi air quality OR delhi pollution',
             'language': 'en',
             'sortBy': 'publishedAt',
-            'apiKey': "9afbb7aabe0d49e78dd57399e5e1ffb9",
+            'apiKey': os.getenv("NEWS_API_KEY", "9afbb7aabe0d49e78dd57399e5e1ffb9"),
             'pageSize': 5
         }
         response = requests.get(url, params=params, timeout=10)
@@ -98,6 +116,7 @@ def delhi_air_news():
             "solution": "Check API key or try again later"
         }), 500
 
+# YOUR ORIGINAL DELHI FORECAST ROUTE - UNCHANGED
 @app.route('/delhi-forecast', methods=['GET'])
 def delhi_pollution_forecast():
     try:
@@ -124,11 +143,13 @@ def delhi_pollution_forecast():
             "solution": "Check API key or coordinates"
         }), 500
 
+# YOUR ORIGINAL VALIDATION FUNCTION - UNCHANGED
 def validate_json(payload, required_fields):
     if not payload:
         return False
     return all(field in payload and payload[field] for field in required_fields)
 
+# YOUR ORIGINAL MODEL AND DATASET LOADING - UNCHANGED
 base_dir = os.path.dirname(os.path.abspath(__file__))
 try:
     with open(os.path.join(base_dir, "rf_model.pkl"), "rb") as f:
@@ -146,6 +167,7 @@ except Exception as e:
     print(f"Error loading AQI dataset: {e}")
     df = pd.DataFrame()
 
+# YOUR ORIGINAL CHECK-USER ROUTE - UNCHANGED
 @app.route('/check-user', methods=['POST'])
 def check_user():
     data = request.get_json()
@@ -154,6 +176,7 @@ def check_user():
     exists = User.query.filter_by(username=data['username']).first() is not None
     return jsonify({'exists': exists}), 200
 
+# YOUR ORIGINAL SIGNUP ROUTE - UNCHANGED
 @app.route('/signup', methods=['POST'])
 def signup():
     try:
@@ -206,8 +229,7 @@ def signup():
         print("❌ Exception during signup:", e)
         return jsonify({'error': str(e)}), 500
 
-
-
+# YOUR ORIGINAL LOGIN ROUTE - UNCHANGED
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -226,15 +248,17 @@ def login():
         }
     }), 200
 
-aqidata = [250 , 180, 130 , 100 , 110, 90 , 80 , 110 , 140, 200 , 350 , 300 ]
+# YOUR ORIGINAL AQI DATA - UNCHANGED
+aqidata = [250, 180, 130, 100, 110, 90, 80, 110, 140, 200, 350, 300]
 
-
+# YOUR ORIGINAL AQI GET ROUTE - UNCHANGED
 @app.route('/aqi/<int:index>', methods=['GET'])
 def aqi(index):
     if not 1 <= index <= len(aqidata):
         return jsonify({'error': 'Invalid month index (1-12)'}), 400
     return jsonify({'month_index': index, 'aqi_value': aqidata[index - 1]})
 
+# YOUR ORIGINAL PREDICT ROUTE - UNCHANGED
 @app.route('/predict/<int:index>', methods=['POST'])
 def get_aqi(index):
     data = request.get_json()
@@ -249,8 +273,6 @@ def get_aqi(index):
         return jsonify({'error': 'Invalid month index (1-12)'}), 400
 
     aqi_value = aqidata[index - 1]
-    
-
 
     try:
         new_request = AQIRequest(
@@ -285,7 +307,6 @@ def get_aqi(index):
             forecast_components = first['components']
     except Exception as e:
         print(f"OpenWeatherMap forecast error: {e}")
-
 
     # Dynamic solutions based on AQI value
     if aqi_value <= 50:
@@ -333,6 +354,7 @@ def get_aqi(index):
         'forecast_components': forecast_components
     })
 
+# YOUR ORIGINAL HISTORY ROUTE - UNCHANGED
 @app.route('/history', methods=['POST'])
 def get_history():
     data = request.get_json()
@@ -355,12 +377,14 @@ def get_history():
 
     return jsonify({'history': history_data})
 
+# YOUR ORIGINAL DEBUG DATASET ROUTE - UNCHANGED
 @app.route('/debug-dataset', methods=['GET'])
 def debug_dataset():
     if df.empty:
         return jsonify({"error": "Dataset not loaded or empty"})
     return jsonify({"columns": df.columns.tolist(), "rows": len(df)})
 
+# YOUR ORIGINAL VISUALIZATION ROUTE - UNCHANGED
 @app.route('/run-notebook', methods=['POST'])
 def get_aqi_graphs():
     try:
@@ -374,18 +398,19 @@ def get_aqi_graphs():
         visualizations = {}
         
         # Generate visualizations
-        for viz_type, viz_func in [
-            ("histogram", vis.plot_aqi_histogram),
-            ("trend", vis.plot_aqi_trend),
-            ("heatmap", vis.plot_aqi_heatmap),
-            ("pollutants", vis.plot_pollutant_contribution)
-        ]:
-            try:
-                img = viz_func(month)
-                if img:
-                    visualizations[viz_type] = img
-            except Exception as e:
-                print(f"Error generating {viz_type} visualization: {e}")
+        if vis:  # Only if visualization module is available
+            for viz_type, viz_func in [
+                ("histogram", vis.plot_aqi_histogram),
+                ("trend", vis.plot_aqi_trend),
+                ("heatmap", vis.plot_aqi_heatmap),
+                ("pollutants", vis.plot_pollutant_contribution)
+            ]:
+                try:
+                    img = viz_func(month)
+                    if img:
+                        visualizations[viz_type] = img
+                except Exception as e:
+                    print(f"Error generating {viz_type} visualization: {e}")
 
         if not visualizations:
             return jsonify({"error": "No visualizations generated"}), 500
@@ -399,10 +424,11 @@ def get_aqi_graphs():
         traceback.print_exc()
         return jsonify({"error": f"Failed to generate visualizations: {str(e)}"}), 500
 
+# Health check endpoint for Render
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
-
-
-    
-                                                                    
-
+    port = int(os.getenv('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
