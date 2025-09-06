@@ -2,6 +2,7 @@ services:
   - type: web
     name: aqi-backend
     env: python
+    pythonVersion: 3.11.8
     buildCommand: pip install -r requirements.txt
     startCommand: bash -c 'flask --app app db upgrade && gunicorn --bind 0.0.0.0:$PORT app:app'
     envVars:
